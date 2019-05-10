@@ -54,6 +54,8 @@ unix_path = 'http+unix://%2Ftmp%2Fthumbor'
 ##############################################################################
 # helper methods
 #
+
+
 def response_formater(status_code='400',
                       body={'message': 'error, please check lambda logs'},
                       cache_control='max-age=120,public',
@@ -72,7 +74,8 @@ def response_formater(status_code='400',
     }
 
     if str(os.environ.get('ENABLE_CORS')).upper() == "YES":
-        api_response['headers']['Access-Control-Allow-Origin'] = os.environ.get('CORS_ORIGIN')
+        api_response['headers']['Access-Control-Allow-Origin'] = os.environ.get(
+            'CORS_ORIGIN')
 
     # SO-SIH-175 - 08/28/2018 - Missing header
     # Adding missing header to response
@@ -94,8 +97,9 @@ def response_formater(status_code='400',
     logging.debug('api response: %s' % (api_response))
     return api_response
 
+
 def auto_webp(original_request, request_headers):
-    headers = {'Accept':'*/*'}
+    headers = {'Accept': '*/*'}
     vary = bool(strtobool(str(config.AUTO_WEBP)))
     if vary:
         if original_request.get('headers'):
@@ -105,17 +109,20 @@ def auto_webp(original_request, request_headers):
 
 # SO-SIH-166 - 08/08/2018 - Enabling safe url
 # Encoding url and hashing with security key
+
+
 def encoding_string(string):
     """
     Encoding URL per RFC 3986.
     """
-    return(quote(string,safe=''))
+    return(quote(string, safe=''))
+
 
 def signed_url(secret_key, string_to_sign):
     """
     Signing URL with security key
     """
-    hashed = hmac.new(secret_key,string_to_sign, sha1)
+    hashed = hmac.new(secret_key, string_to_sign, sha1)
     return base64.b64encode(hashed.digest())
 
 
@@ -133,6 +140,7 @@ def rewrite(http_path):
         http_path = lambda_rewrite.match_patterns(http_path)
     return http_path
 
+
 def gen_body(ctype, content):
     """
     Convert image to base64 to be sent as body response.
@@ -148,6 +156,7 @@ def gen_body(ctype, content):
         logging.error('gen_body trace: %s' % traceback.format_exc())
         return None
 
+
 def send_metrics(event, result, start_time):
     """
     Send anonymous usage metrics to AWS.
@@ -162,6 +171,8 @@ def send_metrics(event, result, start_time):
 ##############################################################################
 # server methods
 #
+
+
 def run_server(application, context):
     server = HTTPServer(application)
     define(
@@ -173,6 +184,7 @@ def run_server(application, context):
     server.add_socket(socket)
     server.start(1)
 
+
 def stop_thumbor():
     return None
     tornado.ioloop.IOLoop.instance().stop()
@@ -180,6 +192,7 @@ def stop_thumbor():
         os.remove(thumbor_socket)
     except OSError as error:
         logging.error('stop_thumbor error: %s' % (error))
+
 
 def start_thumbor():
     """
@@ -197,7 +210,8 @@ def start_thumbor():
         global config
         # SO-SIH-167 - 08/08/2018 - Allowing environment variable
         # Passing environment variable flag to server parameters
-        config = get_config(thumbor_config_path, server_parameters.use_environment)
+        config = get_config(thumbor_config_path,
+                            server_parameters.use_environment)
         configure_log(config, server_parameters.log_level)
         importer = get_importer(config)
         os.environ["PATH"] += os.pathsep + '/var/task'
@@ -207,9 +221,9 @@ def start_thumbor():
             run_server(application, thumbor_context)
             tornado.ioloop.IOLoop.instance().start()
             logging.info(
-                        'thumbor running at %s:%d' %
+                'thumbor running at %s:%d' %
                         (thumbor_context.server.ip, thumbor_context.server.port)
-                        )
+            )
             return config
     except RuntimeError as error:
         if str(error) != "IOLoop is already running":
@@ -220,11 +234,13 @@ def start_thumbor():
         logging.error('start_thumbor error: %s' % (error))
         logging.error('start_thumbor trace: %s' % traceback.format_exc())
 
+
 def start_server():
     t = threading.Thread(target=start_thumbor)
     t.daemon = True
     t.start()
     return t
+
 
 def restart_server():
     threads = threading.enumerate()
@@ -238,29 +254,32 @@ def restart_server():
 ##############################################################################
 # request processing methods
 #
+
+
 def is_thumbor_down():
-     if not os.path.exists(thumbor_socket):
-         start_server()
-     session = requests_unixsocket.Session()
-     http_health = '/healthcheck'
-     retries = 10
-     while(retries > 0):
-         try:
-             response = session.get(unix_path + http_health)
-             if (response.status_code == 200):
-                 break
-         except Exception as error:
-             time.sleep(0.03)
-             retries -= 1
-             continue
-     if retries <= 0:
-         logging.error(
-             'call_thumbor error: tornado server unavailable,\
+    if not os.path.exists(thumbor_socket):
+        start_server()
+    session = requests_unixsocket.Session()
+    http_health = '/healthcheck'
+    retries = 10
+    while(retries > 0):
+        try:
+            response = session.get(unix_path + http_health)
+            if (response.status_code == 200):
+                break
+        except Exception as error:
+            time.sleep(0.03)
+            retries -= 1
+            continue
+    if retries <= 0:
+        logging.error(
+            'call_thumbor error: tornado server unavailable,\
              proceeding with tornado server restart'
-         )
-         restart_server()
-         return response_formater(status_code='502')
-     return False, session
+        )
+        restart_server()
+        return response_formater(status_code='502')
+    return False, session
+
 
 def request_thumbor(original_request, session):
     """
@@ -271,7 +290,7 @@ def request_thumbor(original_request, session):
     http_path = original_request['path']
     logging.debug('original_request path: %s' % (http_path))
     try:
-        http_path = rewrite(http_path);
+        http_path = rewrite(http_path)
         logging.debug('http path after rewrite: %s' % (http_path))
         http_path = true_url(http_path)
     except Exception as error:
@@ -280,34 +299,36 @@ def request_thumbor(original_request, session):
     vary, request_headers = auto_webp(original_request, request_headers)
     return session.get(unix_path + http_path, headers=request_headers), vary
 
+
 def process_thumbor_responde(thumbor_response, vary):
-     if thumbor_response.status_code != 200:
-         return response_formater(status_code=thumbor_response.status_code)
-     if vary:
-         vary = thumbor_response.headers['vary']
-     content_type = thumbor_response.headers['content-type']
-     body = gen_body(content_type, thumbor_response.content)
-     # SO-SIH-173 - 08/20/2018 - Lambda payload limit
-     # Lambda limits to 6MB of response payload
-     # https://docs.aws.amazon.com/lambda/latest/dg/limits.html
-     content_length = int(thumbor_response.headers['content-length'])
-     logging.debug('content length: %s' % (content_length))
-     if (content_length > 6000000):
+    if thumbor_response.status_code != 200:
+        return response_formater(status_code=thumbor_response.status_code)
+    if vary and 'vary' in thumbor_response.headers:
+        vary = thumbor_response.headers['vary']
+    content_type = thumbor_response.headers['content-type']
+    body = gen_body(content_type, thumbor_response.content)
+    # SO-SIH-173 - 08/20/2018 - Lambda payload limit
+    # Lambda limits to 6MB of response payload
+    # https://docs.aws.amazon.com/lambda/latest/dg/limits.html
+    content_length = int(thumbor_response.headers['content-length'])
+    logging.debug('content length: %s' % (content_length))
+    if (content_length > 6000000):
         return response_formater(status_code='500',
                                  body={'message': 'body size is too long'},
                                  )
-     if body is None:
-         return response_formater(status_code='500',
-                                  cache_control='no-cache,no-store')
-     return response_formater(status_code='200',
-                              body=body,
-                              cache_control=thumbor_response.headers['Cache-Control'],
-                              content_type=content_type,
-                              expires=thumbor_response.headers['Expires'],
-                              etag=thumbor_response.headers['Etag'],
-                              date=thumbor_response.headers['Date'],
-                              vary=vary
-                              )
+    if body is None:
+        return response_formater(status_code='500',
+                                 cache_control='no-cache,no-store')
+    return response_formater(status_code='200',
+                             body=body,
+                             cache_control=thumbor_response.headers['Cache-Control'],
+                             content_type=content_type,
+                             expires=thumbor_response.headers['Expires'],
+                             etag=thumbor_response.headers['Etag'],
+                             date=thumbor_response.headers['Date'],
+                             vary=vary
+                             )
+
 
 def call_thumbor(original_request):
     thumbor_down, session = is_thumbor_down()
@@ -315,6 +336,7 @@ def call_thumbor(original_request):
         return thumbor_down
     thumbor_response, vary = request_thumbor(original_request, session)
     return process_thumbor_responde(thumbor_response, vary)
+
 
 def lambda_handler(event, context):
     """
@@ -325,10 +347,10 @@ def lambda_handler(event, context):
         global log_level
         log_level = str(os.environ.get('LOG_LEVEL')).upper()
         if log_level not in [
-                                'DEBUG', 'INFO',
-                                'WARNING', 'ERROR',
-                                'CRITICAL'
-                            ]:
+            'DEBUG', 'INFO',
+            'WARNING', 'ERROR',
+            'CRITICAL'
+        ]:
             log_level = 'ERROR'
         logging.getLogger().setLevel(log_level)
 
